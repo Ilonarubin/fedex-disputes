@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FedEx Dispute Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap');
+:root{--red:#C0392B;--dkred:#7B241C;--bg:#0F0F14;--surface:#17171F;--surface2:#1E1E2A;--border:#2A2A3A;--text:#E8E8F0;--muted:#7070A0;--pending:#E67E22;--ok:#27AE60;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* NAV */
+nav{display:flex;align-items:center;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;}
+.nav-logo{font-size:1.1rem;font-weight:800;color:var(--red);padding:1rem 1rem 1rem 0;letter-spacing:-0.03em;border-right:1px solid var(--border);margin-right:0.5rem;white-space:nowrap;}
+.nav-logo span{color:var(--text);}
+.nav-tabs{display:flex;gap:0;}
+.nav-tab{padding:1.1rem 1.2rem;font-size:0.8rem;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s;font-family:'Syne',sans-serif;}
+.nav-tab:hover{color:var(--text);}
+.nav-tab.active{color:var(--red);border-bottom-color:var(--red);}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:0.8rem;}
+.kpi-badge{background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:0.75rem;padding:0.25rem 0.7rem;border-radius:4px;}
+.lang-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.lang-btn{padding:0.3rem 0.7rem;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all 0.15s;font-family:'Syne',sans-serif;}
+.lang-btn.active{background:var(--red);color:#fff;}
+[dir="rtl"] .nav-logo{border-right:none;border-left:1px solid var(--border);margin-right:0;padding:1rem 0 1rem 1rem;}
+[dir="rtl"] .nav-right{margin-left:0;margin-right:auto;}
+
+/* PAGES */
+.page{display:none;padding:1.5rem;}
+.page.active{display:block;}
+
+/* DASHBOARD */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.4rem;position:relative;overflow:hidden;}
+.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent-color,var(--red));}
+.kpi-label{font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;}
+.kpi-val{font-family:'DM Mono',monospace;font-size:2rem;font-weight:500;line-height:1;color:var(--text);}
+.kpi-sub{font-size:0.75rem;color:var(--muted);margin-top:0.3rem;}
+.charts-row{display:grid;grid-template-columns:1fr 1.6fr;gap:1rem;margin-bottom:1.5rem;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem;}
+.chart-title{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;}
+.top-invoices{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem;margin-bottom:1.5rem;}
+.inv-row{display:flex;align-items:center;gap:0.8rem;padding:0.55rem 0;border-bottom:1px solid var(--border);}
+.inv-row:last-child{border-bottom:none;}
+.inv-name{font-family:'DM Mono',monospace;font-size:0.82rem;min-width:140px;}
+.inv-bar-wrap{flex:1;background:var(--surface2);border-radius:2px;height:6px;}
+.inv-bar{height:6px;border-radius:2px;background:var(--red);}
+.inv-val{font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--muted);min-width:70px;text-align:right;}
+.inv-cnt{font-size:0.72rem;color:var(--muted);min-width:70px;text-align:right;}
+
+/* TABLE */
+.toolbar{display:flex;gap:0.8rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;}
+.search-box{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:0.85rem;padding:0.6rem 1rem;border-radius:6px;outline:none;}
+.search-box:focus{border-color:var(--red);}
+.search-box::placeholder{color:var(--muted);}
+select.filter{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Syne',sans-serif;font-size:0.82rem;padding:0.6rem 0.9rem;border-radius:6px;outline:none;cursor:pointer;}
+.btn{padding:0.6rem 1.1rem;font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border-radius:6px;cursor:pointer;border:none;transition:all 0.15s;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-red:hover{background:var(--dkred);}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.btn-outline:hover{border-color:var(--red);color:var(--red);}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--surface2);padding:0.65rem 0.9rem;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-align:left;white-space:nowrap;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);}
+thead th:hover{color:var(--text);}
+thead th.sort-asc::after{content:' ↑';color:var(--red);}
+thead th.sort-desc::after{content:' ↓';color:var(--red);}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;cursor:pointer;}
+tbody tr:hover{background:var(--surface2);}
+tbody tr.pending-row{border-left:3px solid var(--pending);}
+tbody tr.ok-row{border-left:3px solid var(--ok);}
+td{padding:0.6rem 0.9rem;font-size:0.82rem;font-family:'DM Mono',monospace;vertical-align:middle;white-space:nowrap;}
+.badge{display:inline-block;padding:0.2rem 0.6rem;font-size:0.68rem;font-weight:700;letter-spacing:0.05em;border-radius:4px;font-family:'Syne',sans-serif;text-transform:uppercase;}
+.badge-pending{background:rgba(230,126,34,0.15);color:var(--pending);border:1px solid rgba(230,126,34,0.3);}
+.badge-ok{background:rgba(39,174,96,0.15);color:var(--ok);border:1px solid rgba(39,174,96,0.3);}
+.pagination{display:flex;align-items:center;gap:0.5rem;padding:0.8rem 1rem;border-top:1px solid var(--border);font-size:0.8rem;color:var(--muted);}
+.page-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.7rem;border-radius:4px;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.75rem;}
+.page-btn:hover,.page-btn.active{border-color:var(--red);color:var(--red);}
+.page-info{margin:0 0.5rem;}
+
+/* ADD PAGE */
+.add-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.add-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.6rem;}
+.add-section h2{font-size:0.8rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1.2rem;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem;}
+.form-row.full{grid-template-columns:1fr;}
+.form-field{display:flex;flex-direction:column;gap:0.35rem;}
+.form-field label{font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+.form-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:0.85rem;padding:0.55rem 0.8rem;border-radius:6px;outline:none;transition:border-color 0.2s;width:100%;}
+.form-input:focus{border-color:var(--red);}
+.form-input::placeholder{color:var(--muted);}
+.form-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Syne',sans-serif;font-size:0.85rem;padding:0.55rem 0.8rem;border-radius:6px;outline:none;cursor:pointer;width:100%;}
+.form-select:focus{border-color:var(--red);}
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--red);background:rgba(192,57,43,0.05);}
+.upload-icon{font-size:2.5rem;margin-bottom:0.8rem;}
+.upload-title{font-size:1rem;font-weight:700;margin-bottom:0.4rem;}
+.upload-sub{font-size:0.8rem;color:var(--muted);margin-bottom:1rem;}
+.upload-btn-label{display:inline-block;background:var(--red);color:#fff;padding:0.5rem 1.2rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;}
+#fileInput{display:none;}
+.preview-wrap{margin-top:1rem;overflow-x:auto;}
+.preview-table{width:100%;border-collapse:collapse;font-size:0.78rem;font-family:'DM Mono',monospace;}
+.preview-table th{background:var(--surface2);padding:0.4rem 0.6rem;text-align:left;font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+.preview-table td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.8rem;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.4rem;}
+.modal-title{font-size:1.1rem;font-weight:800;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;}
+.modal-close:hover{color:var(--text);}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem;}
+.field{display:flex;flex-direction:column;gap:0.3rem;}
+.field label{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.field-val{font-family:'DM Mono',monospace;font-size:0.85rem;}
+.status-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Syne',sans-serif;font-size:0.9rem;padding:0.5rem 0.8rem;border-radius:6px;outline:none;width:100%;cursor:pointer;}
+.notes-area{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:0.82rem;padding:0.6rem 0.8rem;border-radius:6px;outline:none;width:100%;min-height:80px;resize:vertical;line-height:1.5;}
+.status-select:focus,.notes-area:focus{border-color:var(--red);}
+.modal-actions{display:flex;justify-content:flex-end;gap:0.7rem;margin-top:1.2rem;}
+
+/* TOAST */
+.success-toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--ok);color:#fff;padding:0.8rem 1.4rem;border-radius:8px;font-size:0.9rem;font-weight:700;transform:translateY(80px);opacity:0;transition:all 0.3s;z-index:300;}
+.success-toast.show{transform:translateY(0);opacity:1;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">FedEx<span> Disputes</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('disputes',this)">All Disputes</button>
+    <button class="nav-tab" onclick="showPage('add',this)">+ Add Dispute</button>
+  </div>
+  <div class="nav-right">
+    <span class="kpi-badge" id="nav-pending">— pending</span>
+    <span class="kpi-badge" id="nav-total">— NIS</span>
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('he')">עב</button>
+    </div>
+  </div>
+</nav>
+
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active">
+  <div class="kpi-row">
+    <div class="kpi-card" style="--accent-color:#C0392B"><div class="kpi-label" id="lbl-unhandled">Unhandled</div><div class="kpi-val" id="kpi-pending">—</div><div class="kpi-sub" id="kpi-pending-pct"></div></div>
+    <div class="kpi-card" style="--accent-color:#C0392B"><div class="kpi-label" id="lbl-pendnis">Pending NIS</div><div class="kpi-val" id="kpi-nis-pending">—</div><div class="kpi-sub" id="kpi-nis-pct"></div></div>
+    <div class="kpi-card" style="--accent-color:#27AE60"><div class="kpi-label" id="lbl-resolved">Resolved</div><div class="kpi-val" id="kpi-ok">—</div><div class="kpi-sub">חיוב תקין</div></div>
+    <div class="kpi-card" style="--accent-color:#7070A0"><div class="kpi-label" id="lbl-totalnis">Total NIS</div><div class="kpi-val" id="kpi-total">—</div><div class="kpi-sub" id="lbl-all">all disputes</div></div>
+  </div>
+  <div class="charts-row">
+    <div class="chart-card"><div class="chart-title" id="lbl-rate">Handling Rate</div><div style="position:relative;height:220px"><canvas id="chartDonut"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title" id="lbl-monthly">Monthly Accumulation (pending NIS)</div><div style="position:relative;height:220px"><canvas id="chartMonthly"></canvas></div></div>
+  </div>
+  <div class="top-invoices"><div class="chart-title" id="lbl-topinv">Top Invoices — Unhandled NIS</div><div id="topInvList"></div></div>
+</div>
+
+<!-- ALL DISPUTES -->
+<div id="page-disputes" class="page">
+  <div class="toolbar">
+    <input class="search-box" id="searchBox" placeholder="Search waybill, invoice, query…" oninput="applyFilters()">
+    <select class="filter" id="filterStatus" onchange="applyFilters()">
+      <option value="">All statuses</option>
+      <option value="ממתין לטיפול">Pending</option>
+      <option value="חיוב תקין">Resolved (OK)</option>
+    </select>
+    <select class="filter" id="filterPct" onchange="applyFilters()">
+      <option value="">All overcharge %</option>
+      <option value="0.08">8%</option>
+      <option value="0.11">11%</option>
+      <option value="0.15">15%</option>
+      <option value="0.23">23%</option>
+    </select>
+    <button class="btn btn-outline" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="btn btn-red" onclick="resetFilters()">Reset</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="sortBy('date')">Date</th>
+        <th onclick="sortBy('invoice')">Invoice</th>
+        <th onclick="sortBy('waybill')">Waybill</th>
+        <th onclick="sortBy('query')">Query #</th>
+        <th onclick="sortBy('dispute1')">Dispute #</th>
+        <th onclick="sortBy('pct')">OC%</th>
+        <th onclick="sortBy('nis')">NIS ↓</th>
+        <th>Status</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="pagination" id="paginationBar"></div>
+  </div>
+</div>
+
+<!-- ADD DISPUTE -->
+<div id="page-add" class="page">
+  <div class="add-grid">
+    <div class="add-section">
+      <h2 id="lbl-addmanual">Add Dispute Manually</h2>
+      <div class="form-row">
+        <div class="form-field"><label id="lbl-fdate">Date</label><input class="form-input" id="fDate" placeholder="DD.MM.YYYY"></div>
+        <div class="form-field"><label id="lbl-finvoice">Invoice</label><input class="form-input" id="fInvoice" placeholder="504366047"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label id="lbl-fwaybill">Waybill</label><input class="form-input" id="fWaybill" placeholder="887603848175"></div>
+        <div class="form-field"><label id="lbl-fquery">Query #</label><input class="form-input" id="fQuery" placeholder="45018995"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label id="lbl-fdispute">Dispute #</label><input class="form-input" id="fDispute" placeholder="1641088"></div>
+        <div class="form-field"><label id="lbl-fpct">Overcharge %</label>
+          <select class="form-select" id="fPct">
+            <option value="0">0%</option>
+            <option value="0.08">8%</option>
+            <option value="0.11" selected>11%</option>
+            <option value="0.15">15%</option>
+            <option value="0.23">23%</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label id="lbl-fnis">NIS Amount</label><input class="form-input" id="fNis" type="number" step="0.01" placeholder="0.00"></div>
+        <div class="form-field"><label id="lbl-fstatus">Status</label>
+          <select class="form-select" id="fStatus">
+            <option value="ממתין לטיפול">⏳ Pending</option>
+            <option value="חיוב תקין">✅ Resolved OK</option>
+            <option value="resolved-refund">💰 Refund Received</option>
+            <option value="escalated">🔺 Escalated</option>
+            <option value="ignored">🚫 Closed Without Response</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-field"><label id="lbl-fnotes">Notes</label><textarea class="form-input" id="fNotes" rows="3" style="resize:vertical" placeholder="Email history, actions taken…"></textarea></div>
+      </div>
+      <div style="display:flex;gap:0.7rem;margin-top:0.5rem">
+        <button class="btn btn-red" onclick="submitManual()" id="btn-addrow">+ Add Dispute</button>
+        <button class="btn btn-outline" onclick="clearForm()" id="btn-clear">Clear</button>
+      </div>
+    </div>
+
+    <div class="add-section">
+      <h2 id="lbl-upload">Import from Excel / CSV</h2>
+      <div class="upload-zone" id="uploadZone"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div class="upload-icon">📂</div>
+        <div class="upload-title" id="lbl-dropfile">Drop your file here</div>
+        <div class="upload-sub" id="lbl-dropsub">Supports .xlsx, .xls, .csv</div>
+        <label class="upload-btn-label" for="fileInput" id="lbl-browse">Browse file</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
+      </div>
+      <div id="columnMapper" style="display:none;margin-top:1.2rem">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem" id="lbl-mapcols">Map your columns:</div>
+        <div id="mapperFields" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem"></div>
+        <button class="btn btn-red" onclick="importMapped()" id="btn-import">Import rows</button>
+      </div>
+      <div id="previewArea" style="display:none;margin-top:1rem">
+        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.4rem" id="previewLabel"></div>
+        <div class="preview-wrap"><table class="preview-table" id="previewTable"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modalBg" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Dispute Detail</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-grid">
+      <div class="field"><label>Date</label><div class="field-val" id="mDate">—</div></div>
+      <div class="field"><label>Invoice</label><div class="field-val" id="mInvoice">—</div></div>
+      <div class="field"><label>Waybill</label><div class="field-val" id="mWaybill">—</div></div>
+      <div class="field"><label>Query #</label><div class="field-val" id="mQuery">—</div></div>
+      <div class="field"><label>Dispute #</label><div class="field-val" id="mDispute">—</div></div>
+      <div class="field"><label>Overcharge %</label><div class="field-val" id="mPct">—</div></div>
+      <div class="field"><label>NIS</label><div class="field-val" id="mNis">—</div></div>
+      <div class="field"><label>Approval</label><div class="field-val" id="mApproval">—</div></div>
+    </div>
+    <div class="field" style="margin-bottom:1rem">
+      <label>Status</label>
+      <select class="status-select" id="mStatus">
+        <option value="ממתין לטיפול">⏳ Pending</option>
+        <option value="חיוב תקין">✅ Resolved OK</option>
+        <option value="resolved-refund">💰 Refund Received</option>
+        <option value="escalated">🔺 Escalated</option>
+        <option value="ignored">🚫 Closed Without Response</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea class="notes-area" id="mNotes" placeholder="Add notes…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-red" onclick="saveModal()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="success-toast" id="toast"></div>
+
+<script>
+const STRINGS = {
+  en:{tab1:'Dashboard',tab2:'All Disputes',tab3:'+ Add Dispute',unhandled:'Unhandled',pendnis:'Pending NIS',resolved:'Resolved',totalnis:'Total NIS',all:'all disputes',rate:'Handling Rate',monthly:'Monthly Accumulation (pending NIS)',topinv:'Top Invoices — Unhandled NIS',addmanual:'Add Dispute Manually',upload:'Import from Excel / CSV',dropfile:'Drop your file here',dropsub:'Supports .xlsx, .xls, .csv',browse:'Browse file',mapcols:'Map your columns:',addrow:'+ Add Dispute',clear:'Clear',importbtn:'Import rows',disputes_word:'disputes',search:'Search waybill, invoice, query…',showing:'Showing',of:'of',fdate:'Date',finvoice:'Invoice',fwaybill:'Waybill',fquery:'Query #',fdispute:'Dispute #',fpct:'Overcharge %',fnis:'NIS Amount',fstatus:'Status',fnotes:'Notes',toastAdded:'✓ Dispute added',toastImported:n=>`✓ ${n} dispute${n>1?'s':''} imported`,preview:n=>`Preview — first ${n} rows`,months:['',...'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')]},
+  he:{tab1:'דשבורד',tab2:'כל המחלוקות',tab3:'+ הוסף מחלוקת',unhandled:'לא מטופלות',pendnis:'NIS ממתין',resolved:'טופל',totalnis:'סה"כ NIS',all:'כל המחלוקות',rate:'אחוז טיפול',monthly:'צבירה חודשית (NIS ממתין)',topinv:'חשבוניות מובילות',addmanual:'הוספה ידנית',upload:'ייבוא מ-Excel / CSV',dropfile:'גרור קובץ לכאן',dropsub:'.xlsx, .xls, .csv תומך ב',browse:'בחר קובץ',mapcols:'מפה עמודות:',addrow:'+ הוסף מחלוקת',clear:'נקה',importbtn:'ייבא שורות',disputes_word:'מחלוקות',search:'…חיפוש',showing:'מציג',of:'מתוך',fdate:'תאריך',finvoice:'חשבונית',fwaybill:'Waybill',fquery:'מס׳ פנייה',fdispute:'מס׳ מחלוקת',fpct:'% חיוב',fnis:'סכום NIS',fstatus:'סטטוס',fnotes:'הערות',toastAdded:'✓ נוספה מחלוקת',toastImported:n=>`✓ יובאו ${n} מחלוקות`,preview:n=>`תצוגה מקדימה — ${n} שורות`,months:['',...'ינו פבר מרץ אפר מאי יונ יול אוג ספט אוק נוב דצמ'.split(' ')]}
+};
+
+let lang = 'en';
+function setLang(l) {
+  lang = l;
+  const s = STRINGS[l];
+  document.body.setAttribute('dir', l==='he'?'rtl':'ltr');
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.lang-btn[onclick="setLang('${l}')"]`).classList.add('active');
+  const tabs = document.querySelectorAll('.nav-tab');
+  tabs[0].textContent = s.tab1; tabs[1].textContent = s.tab2; tabs[2].textContent = s.tab3;
+  const ids = {'lbl-unhandled':'unhandled','lbl-pendnis':'pendnis','lbl-resolved':'resolved','lbl-totalnis':'totalnis','lbl-all':'all','lbl-rate':'rate','lbl-monthly':'monthly','lbl-topinv':'topinv','lbl-addmanual':'addmanual','lbl-upload':'upload','lbl-dropfile':'dropfile','lbl-dropsub':'dropsub','lbl-browse':'browse','lbl-mapcols':'mapcols','btn-addrow':'addrow','btn-clear':'clear','btn-import':'importbtn','lbl-fdate':'fdate','lbl-finvoice':'finvoice','lbl-fwaybill':'fwaybill','lbl-fquery':'fquery','lbl-fdispute':'fdispute','lbl-fpct':'fpct','lbl-fnis':'fnis','lbl-fstatus':'fstatus','lbl-fnotes':'fnotes'};
+  Object.entries(ids).forEach(([id,key])=>{const el=document.getElementById(id);if(el&&s[key])el.textContent=s[key];});
+  document.getElementById('searchBox').placeholder = s.search;
+  renderDashboard(); renderTable();
+}
+
+const RAW = [{"id":0,"date":"05.01.2026","invoice":"504366047","waybill":"887603848175","query":"45018995","dispute1":"1641088","pct":0.0,"nis":488.52,"status":"חיוב תקין","notes":"","approval":"חיוב תקין"},{"id":1,"date":"05.01.2026","invoice":"504366047","waybill":"887555391382","query":"45018991‏","dispute1":"1641088","pct":0.08,"nis":737.86,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":2,"date":"04.11.2026","invoice":"504366047","waybill":"885699605700","query":"45018950‏","dispute1":"1645824","pct":0.08,"nis":488.52,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":3,"date":"07.01.2026","invoice":"504369895","waybill":"887660076114","query":"45018705","dispute1":"","pct":0.0,"nis":400.03,"status":"חיוב תקין","notes":"","approval":"חיוב תקין"},{"id":4,"date":"07.01.2026","invoice":"504369895","waybill":"887506332341","query":"45018702‏","dispute1":"1646011","pct":0.08,"nis":550.13,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":5,"date":"26.12.2025","invoice":"504338037","waybill":"887555391382","query":"45018991‏","dispute1":"","pct":0.0,"nis":508.27,"status":"חיוב תקין","notes":"","approval":"חיוב תקין"},{"id":6,"date":"10.12.2025","invoice":"504336667","waybill":"885699605700","query":"45018950‏","dispute1":"1645824","pct":0.08,"nis":627.52,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":7,"date":"10.12.2025","invoice":"504336667","waybill":"887660076114","query":"45018705","dispute1":"","pct":0.0,"nis":0,"status":"חיוב תקין","notes":"","approval":"חיוב תקין"},{"id":8,"date":"26.01.2026","invoice":"504336667","waybill":"886880438608","query":"45042121","dispute1":"1643699","pct":0.08,"nis":556.39,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":9,"date":"25.12.2025","invoice":"504336667","waybill":"886879092817","query":"","dispute1":"1594855","pct":0.08,"nis":627.52,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":10,"date":"30.12.2025","invoice":"504363253‏","waybill":"887469948740","query":"44938878","dispute1":"1643278","pct":0.08,"nis":606.95,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":11,"date":"17.12.2025","invoice":"504369895","waybill":"887133490361","query":"45018700","dispute1":"1645910","pct":0.08,"nis":622.32,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":12,"date":"03.11.2025","invoice":"504291437","waybill":"885680514943","query":"44962078","dispute1":"1545437","pct":0.08,"nis":555.1,"status":"ממתין לטיפול","notes":"The dispute was closed without being handled and without any response to the inquiries. An email was sent to Nicole.","approval":"שגוי"},{"id":13,"date":"01.09.2025","invoice":"504217596","waybill":"883993034123","query":"44964624","dispute1":"1612330","pct":0.08,"nis":604.55,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":14,"date":"03.11.2025","invoice":"504292770","waybill":"885680211980","query":"44045818","dispute1":"1572196","pct":0.08,"nis":594.75,"status":"ממתין לטיפול","notes":"The dispute was closed without being handled and without any response to the inquiries. An email was sent to Dana.","approval":"שגוי"},{"id":15,"date":"21.08.2025","invoice":"504204471","waybill":"883712903494","query":"44964749","dispute1":"1612269","pct":0.15,"nis":382.56,"status":"ממתין לטיפול","notes":"wrong decision","approval":"שגוי"},{"id":16,"date":"28.08.2025","invoice":"504237477","waybill":"883894002956","query":"44964482","dispute1":"1511936","pct":0.23,"nis":582.14,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":17,"date":"26.10.2025","invoice":"504324659","waybill":"885418150836","query":"44957019","dispute1":"1571363","pct":0.11,"nis":872.43,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":18,"date":"13.11.2025","invoice":"504324659","waybill":"885538076150","query":"44962174","dispute1":"1612704","pct":0.08,"nis":529.66,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":19,"date":"19.08.2026","invoice":"504189824","waybill":"883644057780","query":"44964875","dispute1":"1612390","pct":0.15,"nis":402.57,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":20,"date":"25.11.2025","invoice":"504291437","waybill":"885680514943","query":"44962082","dispute1":"1545437","pct":0.08,"nis":555.1,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":21,"date":"02.01.2026","invoice":"504352044","waybill":"885896783862","query":"44964533","dispute1":"1594704","pct":0.08,"nis":669.05,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":22,"date":"31.08.2025","invoice":"504205777","waybill":"883927470717","query":"44964822","dispute1":"1612185","pct":0.15,"nis":303.88,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":23,"date":"02.12.2025","invoice":"504304009‏","waybill":"885770580453","query":"44961380","dispute1":"","pct":0.15,"nis":562.34,"status":"ממתין לטיפול","notes":"3 emails sent all ignored disput not opened","approval":"שגוי"},{"id":24,"date":"11.08.2025","invoice":"504179513","waybill":"883464220144","query":"44964893","dispute1":"1488879","pct":15.0,"nis":662.29,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":25,"date":"11.08.2025","invoice":"504179513","waybill":"883464593262","query":"44964900","dispute1":"1612692","pct":0.23,"nis":363.51,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":26,"date":"28.08.2025","invoice":"504214816","waybill":"883927101720","query":"44964513","dispute1":"1612801","pct":0.08,"nis":613.0,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":27,"date":"27.11.2025","invoice":"504294528","waybill":"885935457754","query":"44961564","dispute1":"1555730","pct":0.08,"nis":551.44,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":28,"date":"03.12.2025","invoice":"504328718","waybill":"886679335504","query":"44935364","dispute1":"1571468","pct":0.08,"nis":600.16,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":29,"date":"18.12.2026","invoice":"504368526","waybill":"887619174610","query":"44964549","dispute1":"1632768","pct":0.11,"nis":768.48,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":30,"date":"15.10.2025","invoice":"5-042-62865","waybill":"885165384561","query":"44964463","dispute1":"1612931","pct":8.0,"nis":589.13,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":31,"date":"07.01.2026","invoice":"5-042-62865","waybill":"887451740730","query":"44936051","dispute1":"","pct":0.0,"nis":447.6,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":32,"date":"15.12.2025","invoice":"5-043-21302","waybill":"886573690917","query":"44960886","dispute1":"1569019","pct":0.08,"nis":705.84,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":33,"date":"29.12.2025","invoice":"504363253","waybill":"887469948740","query":"44938957","dispute1":"","pct":0.08,"nis":606.95,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":34,"date":"15.10.2025","invoice":"5-042-62865","waybill":"885165384561","query":"44962300 -43520269","dispute1":"1612931","pct":0.08,"nis":589.13,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":35,"date":"24.10.2025","invoice":"5-042-17596","waybill":"883993121777","query":"44964644","dispute1":"1612516","pct":0.08,"nis":606.08,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":36,"date":"22.08.2025","invoice":"504369895","waybill":"887660076114","query":"45018705","dispute1":"","pct":0.0,"nis":400.03,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":37,"date":"09.10.2025","invoice":"504204471","waybill":"883712903494","query":"44964749","dispute1":"1612269","pct":0.0,"nis":357.0,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":38,"date":"26.08.2025","invoice":"504328718","waybill":"883826311418","query":"44935363","dispute1":"1571498","pct":0.11,"nis":451.18,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":39,"date":"04.11.2025","invoice":"504364387‏","waybill":"885699175850","query":"44938958","dispute1":"1645950","pct":0.08,"nis":597.95,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":40,"date":"25.01.2026","invoice":"886879092817","waybill":"5-043-36667","query":"45042117","dispute1":"1594855","pct":0.11,"nis":727.7,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":41,"date":"15.01.2026","invoice":"504375651","waybill":"887895043502","query":"","dispute1":"1654626","pct":0.11,"nis":722.7,"status":"ממתין לטיפול","notes":"","approval":""},{"id":42,"date":"25.11.25","invoice":"504390522","waybill":"886337329629","query":"45312680‏","dispute1":"1656529","pct":0.08,"nis":683.08,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":43,"date":"15.12.2025","invoice":"504339704","waybill":"887056929537","query":"45312737","dispute1":"1597669","pct":0.08,"nis":504.65,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":44,"date":"15.12.2025","invoice":"504339704","waybill":"887057137139","query":"45312787‏","dispute1":"1661355/1669697","pct":0.08,"nis":592.55,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":45,"date":"06.11.2025","invoice":"5-043-04009","waybill":"885770580453","query":"","dispute1":"1561963","pct":0.08,"nis":562.34,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":46,"date":"19.01.2026","invoice":"5-043-68526","waybill":"887730926776","query":"44935557","dispute1":"1632813","pct":0.11,"nis":768.48,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":47,"date":"16.11.2025","invoice":"504322608","waybill":"886005486900","query":"44858155 +45313021‏","dispute1":"1569017","pct":0.08,"nis":612.09,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":48,"date":"22.12.2025","invoice":"504330338","waybill":"886833946317","query":"45329945‏","dispute1":"1582208","pct":0.08,"nis":671.15,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":49,"date":"22.12.2025","invoice":"504360943","waybill":"887307071054","query":"45313117‏","dispute1":"1671661","pct":0.08,"nis":596.45,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":50,"date":"22.12.2025","invoice":"504360943","waybill":"887307289474","query":"45313131‏","dispute1":"1671449","pct":0.08,"nis":638.16,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":51,"date":"23.12.2025","invoice":"504360943","waybill":"887327653822","query":"45313134‏","dispute1":"1661355","pct":0.08,"nis":592.06,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":52,"date":"21.12.2025","invoice":"504357913","waybill":"887221023958","query":"44791033","dispute1":"1595317","pct":0.08,"nis":509.45,"status":"ממתין לטיפול","notes":"","approval":"שגןח"},{"id":53,"date":"19.01.2026","invoice":"504377758","waybill":"887998893750","query":"45313649‏","dispute1":"1657288","pct":0.11,"nis":747.75,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":54,"date":"01.01.2026","invoice":"504387298","waybill":"887537390744","query":"45342210+45313659‏","dispute1":"1656701","pct":0.08,"nis":518.72,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":55,"date":"11.12.2025","invoice":"504395104","waybill":"886924525739","query":"45338678‏","dispute1":"","pct":0.08,"nis":571.56,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":56,"date":"15.12.2025","invoice":"504395104","waybill":"887056929537","query":"","dispute1":"1597669","pct":0.11,"nis":0,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":57,"date":"27.01.2026","invoice":"504395104","waybill":"888203730268","query":"45339235‏","dispute1":"1656772","pct":0.11,"nis":768.91,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":58,"date":"29.12.2025","invoice":"504388517","waybill":"887451394512","query":"45339392‏","dispute1":"1657286","pct":0.08,"nis":640.54,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":59,"date":"20.01.2026","invoice":"504388517","waybill":"888016505884","query":"45339468‏","dispute1":"1656506","pct":0.11,"nis":658.27,"status":"ממתין לטיפול","notes":"","approval":""},{"id":60,"date":"20.01.2026","invoice":"504388517","waybill":"888017585340","query":"45339676‏","dispute1":"1672366","pct":0.11,"nis":788.61,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":61,"date":"21.01.2026","invoice":"504388517","waybill":"888051106594","query":"","dispute1":"1671231","pct":0.11,"nis":859.93,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":62,"date":"14.01.2026","invoice":"5-043-68526","waybill":"887619174610","query":"45341770‏","dispute1":"1632768","pct":0.11,"nis":768.48,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":63,"date":"19.01.2026","invoice":"5-043-68526","waybill":"887730926776","query":"","dispute1":"1632813","pct":0.11,"nis":550.08,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":64,"date":"16.01.2026","invoice":"5-043-67402","waybill":"887080657717","query":"45341941‏","dispute1":"1672211","pct":0.08,"nis":521.08,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":65,"date":"07.09.2025","invoice":"5-043-24659","waybill":"884168862195","query":"","dispute1":"1568982","pct":0.11,"nis":672.66,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":66,"date":"2.01.2026","invoice":"504324659","waybill":"885384667307","query":"","dispute1":"1571591","pct":0.11,"nis":709.11,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":67,"date":"02.09.2025","invoice":"504324659","waybill":"884009551603","query":"","dispute1":"1569120","pct":0.11,"nis":684.29,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":68,"date":"02.09.2025","invoice":"504324659","waybill":"884011464519","query":"","dispute1":"1568925","pct":0.11,"nis":690.93,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":69,"date":"04.09.2025","invoice":"504324659","waybill":"884065023850","query":"","dispute1":"1568952","pct":0.11,"nis":701.22,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":70,"date":"07.09.2025","invoice":"504324659","waybill":"884099195573","query":"","dispute1":"1568920","pct":0.11,"nis":696.7,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":71,"date":"04.09.2025","invoice":"504324659","waybill":"884099485776","query":"44436785","dispute1":"1569003","pct":0.11,"nis":451.63,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":72,"date":"24.12.2025","invoice":"504324659","waybill":"885104857776","query":"44436953","dispute1":"1570380","pct":0.11,"nis":680.51,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":73,"date":"10.09.2025","invoice":"504324659","waybill":"884256043760","query":"","dispute1":"1571391","pct":0.11,"nis":614.11,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":74,"date":"23.11.2025","invoice":"504324659","waybill":"886311579000","query":"44436990‏","dispute1":"1570370","pct":0.11,"nis":832.6,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":75,"date":"24.08.2025","invoice":"504324659","waybill":"883809268065","query":"","dispute1":"1612536","pct":0.15,"nis":400.83,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":76,"date":"17.09.2025","invoice":"504324659","waybill":"884441607496","query":"","dispute1":"1612536","pct":0.11,"nis":678.61,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":77,"date":"30.11.2025","invoice":"504324659","waybill":"886542479859","query":"44437030‏","dispute1":"1597548","pct":0.15,"nis":397.41,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":78,"date":"17.09.2025","invoice":"504324659","waybill":"884441972823","query":"44436869‏","dispute1":"1571351","pct":0.11,"nis":623.07,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":79,"date":"01.12.2025","invoice":"5-043-19812","waybill":"886565585711","query":"","dispute1":"1569094","pct":0.0,"nis":408.63,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":80,"date":"07.09.2025","invoice":"504324659","waybill":"884168720336","query":"44436790‏","dispute1":"1568932","pct":0.11,"nis":681.34,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":81,"date":"22.01.2026","invoice":"504324659","waybill":"885384005942","query":"44436979‏","dispute1":"1617175","pct":0.11,"nis":661.27,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":82,"date":"31.08.2025","invoice":"504217596","waybill":"883993034123","query":"44964624‏","dispute1":"1612330","pct":0.08,"nis":604.55,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":83,"date":"19.12.2025","invoice":"504217596","waybill":"884747989300","query":"44436927‏","dispute1":"1570530","pct":0.11,"nis":682.82,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":84,"date":"28.12.2025","invoice":"5-043-00777","waybill":"885877645750","query":"44244431‏","dispute1":"1578651","pct":0.08,"nis":474.0,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":85,"date":"19.12.2025","invoice":"504217596","waybill":"884185791147","query":"44436800","dispute1":"1569061","pct":0.11,"nis":676.88,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":86,"date":"19.12.2025","invoice":"504217596","waybill":"884660072267","query":"44436918‏","dispute1":"1615712","pct":0.11,"nis":641.28,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":87,"date":"02.10.2025","invoice":"5-042-29802","waybill":"884009139586","query":"","dispute1":"1509018","pct":0.0,"nis":398.7,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":88,"date":"10.09.2025","invoice":"504217596","waybill":"884220453246","query":"","dispute1":"1569654","pct":0.11,"nis":687.1,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":89,"date":"17.11.2025","invoice":"504217596","waybill":"886083814150","query":"","dispute1":"1572256","pct":0.08,"nis":532.76,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":90,"date":"14.09.2025","invoice":"504217596","waybill":"884354798620","query":"","dispute1":"1570586","pct":0.11,"nis":581.8,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":91,"date":"25.08.2025","invoice":"5-042-01626","waybill":"883809386023","query":"","dispute1":"1612502","pct":0.15,"nis":397.95,"status":"ממתין לטיפול","notes":"de minimis","approval":"שגוי"},{"id":92,"date":"19.10.2025","invoice":"504217596","waybill":"885295110240","query":"","dispute1":"1571666","pct":0.11,"nis":975.7,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":93,"date":"17.12.2025","invoice":"504217596","waybill":"885294935455","query":"","dispute1":"1570545","pct":0.11,"nis":669.07,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":94,"date":"06.11.2025","invoice":"5-042-69939","waybill":"885312256814","query":"","dispute1":"1527963","pct":0.08,"nis":578.2,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":95,"date":"12.10.2025","invoice":"504217596","waybill":"885035183082","query":"","dispute1":"1572452","pct":0.11,"nis":385.81,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":96,"date":"21.11.2025","invoice":"5-042-88029","waybill":"885610008308","query":"","dispute1":"1612830","pct":0.08,"nis":744.36,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":97,"date":"17.12.2025","invoice":"504217596","waybill":"884542384944","query":"","dispute1":"1570498","pct":0.11,"nis":685.88,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":98,"date":"03.12.2025","invoice":"5-043-06708","waybill":"886148528593","query":"","dispute1":"1570444","pct":0.08,"nis":301.35,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":99,"date":"17.12.2025","invoice":"504217596","waybill":"885225628319","query":"","dispute1":"1573270","pct":0.11,"nis":711.0,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":100,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884785393557","query":"","dispute1":"1570431","pct":0.11,"nis":670.07,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":101,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884475325565","query":"","dispute1":"1570349","pct":0.11,"nis":689.65,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":102,"date":"12.12.2025","invoice":"5-043-19812","waybill":"886629414294","query":"","dispute1":"1571905","pct":0.0,"nis":439.91,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":103,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884814703284","query":"","dispute1":"1572194","pct":0.11,"nis":621.78,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":104,"date":"04.12.2025","invoice":"5-043-08650","waybill":"886148130798","query":"","dispute1":"1562241","pct":0.0,"nis":512.93,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":105,"date":"16.10.2025","invoice":"5-043-24659","waybill":"885191475291","query":"","dispute1":"1571369","pct":0.11,"nis":687.03,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":106,"date":"08.10.2025","invoice":"5-042-50200","waybill":"884903493121","query":"","dispute1":"1612663","pct":0.08,"nis":605.93,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":107,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884255583316","query":"","dispute1":"1571411","pct":0.11,"nis":644.43,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":108,"date":"17.12.2025","invoice":"5-043-24659","waybill":"886225384155","query":"","dispute1":"1570478","pct":0.11,"nis":811.98,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":109,"date":"28.08.2025","invoice":"5-042-29802","waybill":"883894351415","query":"","dispute1":"1509009","pct":0.08,"nis":600.69,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":110,"date":"25.09.2025","invoice":"5-043-24659","waybill":"884542720006","query":"","dispute1":"1570344","pct":0.11,"nis":685.02,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":111,"date":"02.12.2025","invoice":"5-043-19812","waybill":"886633344920","query":"","dispute1":"1571485","pct":0.0,"nis":499.55,"status":"חיוב תקין","notes":"","approval":"תקין"},{"id":112,"date":"06.10.2025","invoice":"5-043-24659","waybill":"884920369837","query":"","dispute1":"1570409","pct":0.11,"nis":546.94,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":113,"date":"17.11.2025","invoice":"5-043-10231","waybill":"886084064550","query":"","dispute1":"1555265","pct":0.08,"nis":520.85,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":114,"date":"09.10.2025","invoice":"5-043-24659","waybill":"884997268380","query":"","dispute1":"1570552","pct":0.11,"nis":662.14,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":115,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884659308013","query":"","dispute1":"1571424","pct":0.11,"nis":686.52,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":116,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884543984031","query":"","dispute1":"1570366","pct":0.11,"nis":672.91,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":117,"date":"03.12.2025","invoice":"5-043-06708","waybill":"885806511024","query":"","dispute1":"1554324","pct":0.11,"nis":687.23,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":118,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884729898997","query":"","dispute1":"1570594","pct":0.11,"nis":685.43,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":119,"date":"17.12.2025","invoice":"5-043-24659","waybill":"885191845234","query":"","dispute1":"1570529","pct":0.11,"nis":687.89,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":120,"date":"23.10.2025","invoice":"5-042-50200","waybill":"884903662882","query":"","dispute1":"1612551","pct":0.08,"nis":538.44,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":121,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884552884776","query":"","dispute1":"1570202","pct":0.11,"nis":682.42,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":122,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884288595790","query":"","dispute1":"1569453","pct":0.11,"nis":680.25,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":123,"date":"17.12.2025","invoice":"5-043-24659","waybill":"886311384037","query":"","dispute1":"1570506","pct":0.11,"nis":862.42,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":124,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884628537370","query":"","dispute1":"1570546","pct":0.11,"nis":678.63,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":125,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884730348569","query":"","dispute1":"1570687","pct":0.11,"nis":688.04,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":126,"date":"09.11.2025","invoice":"5-043-00777","waybill":"885877578406","query":"","dispute1":"1584036","pct":0.08,"nis":580.46,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":127,"date":"17.12.2025","invoice":"5-043-24659","waybill":"885104521160","query":"","dispute1":"1570462","pct":0.11,"nis":676.24,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":128,"date":"13.11.2025","invoice":"5-042-77382","waybill":"885506907859","query":"","dispute1":"1612123","pct":0.08,"nis":703.71,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":129,"date":"17.12.2025","invoice":"5-043-24659","waybill":"885295147166","query":"","dispute1":"1571386","pct":0.11,"nis":509.32,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":130,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884372309225","query":"","dispute1":"1568989","pct":0.11,"nis":691.81,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":131,"date":"01.12.2025","invoice":"5-043-21302","waybill":"886563658464","query":"","dispute1":"1569042","pct":0.08,"nis":87.48,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":132,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884748560269","query":"","dispute1":"1571373","pct":0.11,"nis":573.08,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":133,"date":"17.12.2025","invoice":"5-043-24659","waybill":"884408116498","query":"","dispute1":"1569495","pct":0.11,"nis":691.27,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":134,"date":"24.11.2025","invoice":"5-043-96755","waybill":"886335649604","query":"45448657‏","dispute1":"1671457","pct":0.08,"nis":811.61,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":135,"date":"29.01.2025","invoice":"504404455","waybill":"884028973269","query":"","dispute1":"1671600","pct":0.11,"nis":956.87,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":136,"date":"01.02.2025","invoice":"504404455","waybill":"888304526832","query":"45476537‏","dispute1":"1672545","pct":0.11,"nis":748.61,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":137,"date":"12.01.2025","invoice":"504401283","waybill":"887802840600","query":"45500792‏","dispute1":"1686833","pct":0.11,"nis":565.43,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":138,"date":"08.09.2025","invoice":"504406295","waybill":"884168917714","query":"45571679‏","dispute1":"1688062","pct":0.11,"nis":209.76,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":139,"date":"05.10.2025","invoice":"504406295","waybill":"884814728336","query":"45571698‏","dispute1":"1687729","pct":0.11,"nis":67.27,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":140,"date":"13.01.2026","invoice":"504370803","waybill":"887820845005","query":"45084688‏","dispute1":"1632113","pct":0.11,"nis":886.19,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":141,"date":"08.02.2026","invoice":"504418707","waybill":"888510200787","query":"45713326‏-45713327‏","dispute1":"1689621","pct":0.11,"nis":914.59,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":142,"date":"11.02.2026","invoice":"504418707","waybill":"888647283382","query":"45713332‏","dispute1":"","pct":0.11,"nis":990.65,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":143,"date":"09.02.2026","invoice":"504427172","waybill":"888584944890","query":"45733703‏","dispute1":"","pct":0.11,"nis":730.41,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":144,"date":"09.09.2025","invoice":"504432428","waybill":"884029267320","query":"45998843","dispute1":"","pct":0.08,"nis":237.86,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":145,"date":"15.09.0025","invoice":"504432428","waybill":"884354741013","query":"45999009","dispute1":"","pct":0.08,"nis":589.72,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":146,"date":"19.09.2025","invoice":"504432428","waybill":"884354825671","query":"45999347","dispute1":"","pct":0.08,"nis":78.12,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":147,"date":"28.09.2025","invoice":"504432428","waybill":"884659493620","query":"45999651","dispute1":"","pct":0.08,"nis":361.77,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":148,"date":"12.10.2025","invoice":"504432428","waybill":"885034637242","query":"45999829","dispute1":"","pct":0.08,"nis":119.04,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":149,"date":"22.10.2026","invoice":"504432428","waybill":"885348920879","query":"45999972","dispute1":"","pct":0.08,"nis":88.69,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":150,"date":"22.01.2026","invoice":"504432428","waybill":"885379649272","query":"46000057","dispute1":"","pct":0.08,"nis":308.35,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":151,"date":"27.01.2026","invoice":"504432428","waybill":"885487256583","query":"46000208","dispute1":"","pct":0.08,"nis":563.33,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":152,"date":"29.01.2026","invoice":"504432428","waybill":"885574581699","query":"46000283","dispute1":"","pct":0.08,"nis":591.26,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":153,"date":"07.12.2026","invoice":"504432428","waybill":"886723155176","query":"46018199","dispute1":"","pct":0.08,"nis":594.17,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":154,"date":"07.12.2025","invoice":"504432428","waybill":"886723907095","query":"46018351","dispute1":"","pct":0.08,"nis":489.18,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":155,"date":"08.12.2025","invoice":"504432428","waybill":"886809915129","query":"46018437","dispute1":"","pct":0.08,"nis":613.94,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":156,"date":"18.12.2025","invoice":"504432428","waybill":"887178385387","query":"46018476","dispute1":"","pct":0.08,"nis":501.82,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":157,"date":"28.12.2025","invoice":"504432428","waybill":"887410669358","query":"46018548","dispute1":"","pct":0.08,"nis":840.88,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":158,"date":"18.01.2026","invoice":"504432428","waybill":"887928894430","query":"46018622","dispute1":"","pct":0.11,"nis":489.52,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":159,"date":"19.01.2026","invoice":"504432428","waybill":"887999070776","query":"46018695","dispute1":"","pct":0.11,"nis":777.95,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":160,"date":"25.01.2026","invoice":"","waybill":"888120872646","query":"46021647","dispute1":"","pct":0.11,"nis":432.05,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":161,"date":"15.10.2025","invoice":"504434372","waybill":"885104151161","query":"46042438","dispute1":"","pct":0.08,"nis":188.83,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":162,"date":"15.10.2025","invoice":"504434372","waybill":"885104331647","query":"46042612","dispute1":"","pct":0.08,"nis":120.1,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":163,"date":"25.02.2026","invoice":"504434372","waybill":"889022278769","query":"46042701","dispute1":"","pct":0.11,"nis":567.07,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":164,"date":"18.02.2026","invoice":"504436630","waybill":"888833802465","query":"46092298","dispute1":"","pct":0.039,"nis":340.65,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":165,"date":"12.03.2026","invoice":"504436630","waybill":"889502038371","query":"46092298","dispute1":"","pct":0.11,"nis":651.82,"status":"ממתין לטיפול","notes":"","approval":"שגוי"},{"id":166,"date":"nan","invoice":"","waybill":"","query":"","dispute1":"","pct":0,"nis":0,"status":"ממתין לטיפול","notes":"","approval":""}];
+
+let data = RAW.filter(r=>r.waybill||r.invoice).map(r=>({...r}));
+const stored = localStorage.getItem('fedex_v3');
+if(stored){const u=JSON.parse(stored);u.forEach(x=>{const r=data.find(d=>d.id===x.id);if(r){r.status=x.status;r.notes=x.notes;}});}
+
+let filtered=[...data],sortCol='nis',sortDir=-1,currentPage=1;
+const PER_PAGE=30;
+let activeModal=null,chartDonut=null,chartMonthly=null;
+
+const fmt=n=>n>0?'₪'+n.toLocaleString('en',{maximumFractionDigits:0}):'—';
+function isPending(r){return r.status==='ממתין לטיפול';}
+function isOk(r){return r.status==='חיוב תקין'||r.status==='חיוב תקין ';}
+function saveStorage(){localStorage.setItem('fedex_v3',JSON.stringify(data.map(r=>({id:r.id,status:r.status,notes:r.notes}))));}
+
+function showPage(page,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(page==='dashboard')renderDashboard();
+  if(page==='disputes')applyFilters();
+}
+
+function renderDashboard(){
+  const s=STRINGS[lang];
+  const pending=data.filter(isPending),ok=data.filter(isOk);
+  const pNis=pending.reduce((a,r)=>a+r.nis,0),tNis=data.reduce((a,r)=>a+r.nis,0);
+  document.getElementById('kpi-pending').textContent=pending.length;
+  document.getElementById('kpi-pending-pct').textContent=Math.round(pending.length/data.length*100)+'% of '+data.length;
+  document.getElementById('kpi-nis-pending').textContent=fmt(pNis);
+  document.getElementById('kpi-nis-pct').textContent=Math.round(pNis/tNis*100)+'% of total';
+  document.getElementById('kpi-ok').textContent=ok.length;
+  document.getElementById('kpi-total').textContent=fmt(tNis);
+  document.getElementById('nav-pending').textContent=pending.length+' pending';
+  document.getElementById('nav-total').textContent=fmt(pNis);
+
+  if(chartDonut)chartDonut.destroy();
+  chartDonut=new Chart(document.getElementById('chartDonut'),{type:'doughnut',data:{labels:['Unhandled','Resolved'],datasets:[{data:[pending.length,ok.length],backgroundColor:['#C0392B','#27AE60'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:'#7070A0',font:{size:11},padding:16}}}}});
+
+  const monthMap={};
+  pending.forEach(r=>{const p=r.date.split('.');if(p.length===3&&p[2].length===4){const k=p[2]+'-'+p[1].padStart(2,'0');if(k>='2025-01'&&k<='2026-12')monthMap[k]=(monthMap[k]||0)+r.nis;}});
+  const months=Object.keys(monthMap).sort();
+  const mlabels=months.map(m=>{const[y,mo]=m.split('-');return s.months[parseInt(mo)]+' \''+y.slice(2);});
+  if(chartMonthly)chartMonthly.destroy();
+  chartMonthly=new Chart(document.getElementById('chartMonthly'),{type:'bar',data:{labels:mlabels,datasets:[{label:'NIS',data:months.map(m=>Math.round(monthMap[m])),backgroundColor:'#C0392B',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#7070A0',font:{size:10}}},y:{grid:{color:'#2A2A3A'},ticks:{color:'#7070A0',font:{size:10},callback:v=>'₪'+(v>=1000?(v/1000).toFixed(0)+'k':v)}}}}});
+
+  const inv={};
+  pending.forEach(r=>{if(!r.invoice)return;if(!inv[r.invoice])inv[r.invoice]={nis:0,cnt:0};inv[r.invoice].nis+=r.nis;inv[r.invoice].cnt++;});
+  const top=Object.entries(inv).sort((a,b)=>b[1].nis-a[1].nis).slice(0,8);
+  const mx=top[0]?.[1].nis||1;
+  document.getElementById('topInvList').innerHTML=top.map(([inv,{nis,cnt}])=>`<div class="inv-row"><div class="inv-name">${inv}</div><div class="inv-bar-wrap"><div class="inv-bar" style="width:${(nis/mx*100).toFixed(1)}%"></div></div><div class="inv-val">${fmt(nis)}</div><div class="inv-cnt">${cnt} ${s.disputes_word}</div></div>`).join('');
+}
+
+function applyFilters(){
+  const q=document.getElementById('searchBox').value.toLowerCase();
+  const st=document.getElementById('filterStatus').value;
+  const pct=document.getElementById('filterPct').value;
+  filtered=data.filter(r=>{
+    const mq=!q||[r.invoice,r.waybill,r.query,r.dispute1,r.notes].join(' ').toLowerCase().includes(q);
+    const ms=!st||r.status===st;
+    const mp=!pct||Math.abs(r.pct-parseFloat(pct))<0.001;
+    return mq&&ms&&mp;
+  });
+  filtered.sort((a,b)=>{let va=a[sortCol],vb=b[sortCol];if(typeof va==='string')va=va.toLowerCase();if(typeof vb==='string')vb=vb.toLowerCase();return va<vb?-sortDir:va>vb?sortDir:0;});
+  currentPage=1;renderTable();
+}
+
+function sortBy(col){
+  if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1;}
+  document.querySelectorAll('thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
+  applyFilters();
+}
+
+function resetFilters(){document.getElementById('searchBox').value='';document.getElementById('filterStatus').value='';document.getElementById('filterPct').value='';applyFilters();}
+
+function renderTable(){
+  const start=(currentPage-1)*PER_PAGE;
+  const page=filtered.slice(start,start+PER_PAGE);
+  document.getElementById('tableBody').innerHTML=page.map(r=>{
+    const pend=isPending(r),cls=pend?'pending-row':isOk(r)?'ok-row':'';
+    const badge=pend?'<span class="badge badge-pending">Pending</span>':isOk(r)?'<span class="badge badge-ok">OK</span>':`<span class="badge badge-pending">${r.status}</span>`;
+    const ni=r.notes?'💬':'';
+    return `<tr class="${cls}" onclick="openModal(${r.id})"><td>${r.date}</td><td>${r.invoice||'—'}</td><td style="font-size:0.75rem">${r.waybill||'—'}</td><td>${r.query||'—'}</td><td>${r.dispute1||'—'}</td><td>${r.pct>0&&r.pct<=1?(r.pct*100).toFixed(0)+'%':r.pct>1?r.pct+'%':'—'}</td><td style="color:${pend?'#E67E22':'inherit'};font-weight:${pend?600:400}">${fmt(r.nis)}</td><td>${badge}</td><td>${ni}</td></tr>`;
+  }).join('');
+  renderPagination();
+}
+
+function renderPagination(){
+  const s=STRINGS[lang];
+  const total=filtered.length,pages=Math.ceil(total/PER_PAGE);
+  const start=(currentPage-1)*PER_PAGE+1,end=Math.min(currentPage*PER_PAGE,total);
+  let h=`<span class="page-info">${s.showing} ${start}–${end} ${s.of} ${total}</span>`;
+  h+=`<button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||Math.abs(i-currentPage)<=2)h+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="changePage(${i})">${i}</button>`;else if(Math.abs(i-currentPage)===3)h+=`<span style="color:var(--muted);padding:0 4px">…</span>`;}
+  h+=`<button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===pages?'disabled':''}>›</button>`;
+  document.getElementById('paginationBar').innerHTML=h;
+}
+
+function changePage(p){const pages=Math.ceil(filtered.length/PER_PAGE);if(p<1||p>pages)return;currentPage=p;renderTable();}
+
+function openModal(id){
+  const r=data.find(x=>x.id===id);if(!r)return;activeModal=r;
+  document.getElementById('modalTitle').textContent='Dispute — '+(r.invoice||r.waybill);
+  document.getElementById('mDate').textContent=r.date;
+  document.getElementById('mInvoice').textContent=r.invoice||'—';
+  document.getElementById('mWaybill').textContent=r.waybill||'—';
+  document.getElementById('mQuery').textContent=r.query||'—';
+  document.getElementById('mDispute').textContent=r.dispute1||'—';
+  document.getElementById('mPct').textContent=r.pct>0&&r.pct<=1?(r.pct*100).toFixed(1)+'%':r.pct>1?r.pct+'%':'—';
+  document.getElementById('mNis').textContent=fmt(r.nis);
+  document.getElementById('mApproval').textContent=r.approval||'—';
+  document.getElementById('mStatus').value=r.status;
+  document.getElementById('mNotes').value=r.notes;
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal(e){if(e&&e.target!==document.getElementById('modalBg'))return;document.getElementById('modalBg').classList.remove('open');activeModal=null;}
+function saveModal(){if(!activeModal)return;activeModal.status=document.getElementById('mStatus').value;activeModal.notes=document.getElementById('mNotes').value;saveStorage();document.getElementById('modalBg').classList.remove('open');activeModal=null;applyFilters();renderDashboard();}
+
+function submitManual(){
+  const date=document.getElementById('fDate').value.trim()||'—';
+  const invoice=document.getElementById('fInvoice').value.trim();
+  const waybill=document.getElementById('fWaybill').value.trim();
+  const query=document.getElementById('fQuery').value.trim();
+  const dispute1=document.getElementById('fDispute').value.trim();
+  const pct=parseFloat(document.getElementById('fPct').value)||0;
+  const nis=parseFloat(document.getElementById('fNis').value)||0;
+  const status=document.getElementById('fStatus').value;
+  const notes=document.getElementById('fNotes').value.trim();
+  if(!waybill&&!invoice){alert('Please enter at least a Waybill or Invoice number');return;}
+  const newId=Math.max(...data.map(r=>r.id))+1;
+  data.push({id:newId,date,invoice,waybill,query,dispute1,pct,nis,status,notes,approval:status==='ממתין לטיפול'?'שגוי':'תקין'});
+  saveStorage();showToast(STRINGS[lang].toastAdded);clearForm();renderDashboard();
+}
+function clearForm(){['fDate','fInvoice','fWaybill','fQuery','fDispute','fNis','fNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('fPct').value='0.11';document.getElementById('fStatus').value='ממתין לטיפול';}
+
+let parsedFileRows=[],fileHeaders=[];
+function handleDrop(e){e.preventDefault();document.getElementById('uploadZone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f)processFile(f);}
+function handleFileSelect(e){const f=e.target.files[0];if(f)processFile(f);}
+function processFile(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(rows.length<2)return;
+    fileHeaders=rows[0].map(String);
+    parsedFileRows=rows.slice(1).filter(r=>r.some(c=>c!==''));
+    showColumnMapper(fileHeaders);
+    const s=STRINGS[lang];
+    const n=Math.min(parsedFileRows.length,5);
+    document.getElementById('previewLabel').textContent=s.preview(n);
+    document.getElementById('previewTable').innerHTML=`<tr>${fileHeaders.map(h=>`<th>${h}</th>`).join('')}</tr>`+parsedFileRows.slice(0,n).map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+    document.getElementById('previewArea').style.display='block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+const FKEYS=['date','invoice','waybill','query','dispute','pct','nis','status','notes'];
+const FLABELS={date:'Date',invoice:'Invoice',waybill:'Waybill',query:'Query #',dispute:'Dispute #',pct:'OC %',nis:'NIS',status:'Status',notes:'Notes'};
+function showColumnMapper(headers){
+  document.getElementById('mapperFields').innerHTML=FKEYS.map(f=>{
+    const opts=[`<option value="">— skip —</option>`,...headers.map((h,i)=>{
+      const auto=h.toLowerCase().includes(f)||(f==='nis'&&/nis|sum/i.test(h))||(f==='pct'&&/%|overcharge/i.test(h))||(f==='waybill'&&/waybill/i.test(h))||(f==='invoice'&&/invoice/i.test(h))||(f==='date'&&/date|תאריך/i.test(h))||(f==='status'&&/status|סטטוס/i.test(h))||(f==='notes'&&/note|הערה/i.test(h));
+      return `<option value="${i}" ${auto?'selected':''}>${h}</option>`;
+    })].join('');
+    return `<div class="form-field"><label>${FLABELS[f]}</label><select class="form-select" id="map_${f}">${opts}</select></div>`;
+  }).join('');
+  document.getElementById('columnMapper').style.display='block';
+}
+function importMapped(){
+  const gc=f=>{const s=document.getElementById('map_'+f);return s&&s.value!==''?parseInt(s.value):-1;};
+  const cm={};FKEYS.forEach(f=>{cm[f]=gc(f);});
+  let imported=0,nextId=Math.max(...data.map(r=>r.id))+1;
+  parsedFileRows.forEach(row=>{
+    const get=f=>cm[f]>=0?String(row[cm[f]]??''). trim():'';
+    const nis=parseFloat(get('nis').replace(',',''))||0;
+    const pct=parseFloat(get('pct'))||0;
+    const status=get('status')||'ממתין לטיפול';
+    const nr={id:nextId++,date:get('date')||'—',invoice:get('invoice'),waybill:get('waybill'),query:get('query'),dispute1:get('dispute'),pct:pct>1?pct/100:pct,nis,status,notes:get('notes'),approval:status==='ממתין לטיפול'?'שגוי':'תקין'};
+    if(nr.waybill||nr.invoice){data.push(nr);imported++;}
+  });
+  if(imported>0){saveStorage();showToast(STRINGS[lang].toastImported(imported));document.getElementById('previewArea').style.display='none';document.getElementById('columnMapper').style.display='none';document.getElementById('fileInput').value='';parsedFileRows=[];renderDashboard();}
+}
+
+function exportExcel(){
+  const rows=filtered.map(r=>({'Date':r.date,'Invoice':r.invoice,'Waybill':r.waybill,'Query':r.query,'Dispute#':r.dispute1,'OC%':r.pct>0&&r.pct<=1?parseFloat((r.pct*100).toFixed(1)):r.pct,'NIS':r.nis,'Status':r.status,'Notes':r.notes}));
+  const wb2=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb2,XLSX.utils.json_to_sheet(rows),'Disputes');
+  XLSX.writeFile(wb2,'fedex_disputes_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function exportCSV(){
+  const h=['Date','Invoice','Waybill','Query','Dispute#','OC%','NIS','Status','Notes'];
+  const rows=filtered.map(r=>[r.date,r.invoice,r.waybill,r.query,r.dispute1,r.pct>0&&r.pct<=1?(r.pct*100).toFixed(0)+'%':r.pct,r.nis,r.status,r.notes].map(v=>typeof v==='string'&&v.includes(',')?`"${v}"`:v).join(','));
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent([h.join(','),...rows].join('\n'));a.download='fedex_disputes.csv';a.click();
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+renderDashboard();
+applyFilters();
+</script>
+</body>
+</html>
