@@ -284,14 +284,14 @@ td{padding:0.6rem 0.9rem;font-size:0.82rem;font-family:'DM Mono',monospace;verti
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-grid">
-      <div class="field"><label>Date</label><div class="field-val" id="mDate">—</div></div>
-      <div class="field"><label>Invoice</label><div class="field-val" id="mInvoice">—</div></div>
-      <div class="field"><label>Waybill</label><div class="field-val" id="mWaybill">—</div></div>
-      <div class="field"><label>Query #</label><div class="field-val" id="mQuery">—</div></div>
-      <div class="field"><label>Dispute #</label><div class="field-val" id="mDispute">—</div></div>
-      <div class="field"><label>Overcharge %</label><div class="field-val" id="mPct">—</div></div>
-      <div class="field"><label>NIS</label><div class="field-val" id="mNis">—</div></div>
-      <div class="field"><label>Approval</label><div class="field-val" id="mApproval">—</div></div>
+      <div class="field"><label>Date</label><input class="form-input" id="mDate" placeholder="DD.MM.YYYY"></div>
+      <div class="field"><label>Invoice</label><input class="form-input" id="mInvoice" placeholder="—"></div>
+      <div class="field"><label>Waybill</label><input class="form-input" id="mWaybill" placeholder="—"></div>
+      <div class="field"><label>Query #</label><input class="form-input" id="mQuery" placeholder="—"></div>
+      <div class="field"><label>Dispute #</label><input class="form-input" id="mDispute" placeholder="—"></div>
+      <div class="field"><label>Overcharge %</label><select class="form-select" id="mPct"><option value="0">0%</option><option value="0.08">8%</option><option value="0.11">11%</option><option value="0.15">15%</option><option value="0.23">23%</option></select></div>
+      <div class="field"><label>NIS</label><input class="form-input" type="number" step="0.01" id="mNis" placeholder="0.00"></div>
+      <div class="field"><label>Approval</label><input class="form-input" id="mApproval" placeholder="—"></div>
     </div>
     <div class="field" style="margin-bottom:1rem">
       <label>Status</label>
@@ -441,20 +441,20 @@ function changePage(p){const pages=Math.ceil(filtered.length/PER_PAGE);if(p<1||p
 function openModal(id){
   const r=data.find(x=>x.id===id);if(!r)return;activeModal=r;
   document.getElementById('modalTitle').textContent='Dispute — '+(r.invoice||r.waybill);
-  document.getElementById('mDate').textContent=r.date;
-  document.getElementById('mInvoice').textContent=r.invoice||'—';
-  document.getElementById('mWaybill').textContent=r.waybill||'—';
-  document.getElementById('mQuery').textContent=r.query||'—';
-  document.getElementById('mDispute').textContent=r.dispute1||'—';
-  document.getElementById('mPct').textContent=r.pct>0&&r.pct<=1?(r.pct*100).toFixed(1)+'%':r.pct>1?r.pct+'%':'—';
-  document.getElementById('mNis').textContent=fmt(r.nis);
-  document.getElementById('mApproval').textContent=r.approval||'—';
+  document.getElementById('mDate').value=r.date||'';
+  document.getElementById('mInvoice').value=r.invoice||'';
+  document.getElementById('mWaybill').value=r.waybill||'';
+  document.getElementById('mQuery').value=r.query||'';
+  document.getElementById('mDispute').value=r.dispute1||'';
+  document.getElementById('mPct').value=String(r.pct||0);
+  document.getElementById('mNis').value=r.nis||'';
+  document.getElementById('mApproval').value=r.approval||'';
   document.getElementById('mStatus').value=r.status;
   document.getElementById('mNotes').value=r.notes;
   document.getElementById('modalBg').classList.add('open');
 }
 function closeModal(e){if(e&&e.target!==document.getElementById('modalBg'))return;document.getElementById('modalBg').classList.remove('open');activeModal=null;}
-function saveModal(){if(!activeModal)return;activeModal.status=document.getElementById('mStatus').value;activeModal.notes=document.getElementById('mNotes').value;saveStorage();document.getElementById('modalBg').classList.remove('open');activeModal=null;applyFilters();renderDashboard();}
+function saveModal(){if(!activeModal)return;activeModal.date=document.getElementById('mDate').value||activeModal.date;activeModal.invoice=document.getElementById('mInvoice').value;activeModal.waybill=document.getElementById('mWaybill').value;activeModal.query=document.getElementById('mQuery').value;activeModal.dispute1=document.getElementById('mDispute').value;activeModal.pct=parseFloat(document.getElementById('mPct').value)||0;activeModal.nis=parseFloat(document.getElementById('mNis').value)||0;activeModal.approval=document.getElementById('mApproval').value;activeModal.status=document.getElementById('mStatus').value;activeModal.notes=document.getElementById('mNotes').value;saveStorage();document.getElementById('modalBg').classList.remove('open');activeModal=null;applyFilters();renderDashboard();}
 
 function submitManual(){
   const date=document.getElementById('fDate').value.trim()||'—';
