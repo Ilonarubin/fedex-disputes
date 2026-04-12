@@ -334,17 +334,12 @@ function syncToSheets(callback) {
 
   fetch(SHEETS_URL, {
     method: 'POST',
-    mode: 'cors',
+    mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action: 'sync', rows: data })
   })
-  .then(function(r){ return r.json(); })
-  .then(function(res){
-    if(res && res.result === 'success'){
-      setCloudStatus('✓ נשמר בענן ' + new Date().toLocaleTimeString('he-IL'), '#27AE60');
-    } else {
-      setCloudStatus('⚠ שגיאת ענן', '#C0392B');
-    }
+  .then(function(){
+    setCloudStatus('✓ נשמר בענן ' + new Date().toLocaleTimeString('he-IL'), '#27AE60');
     if(btn){ btn.textContent = '☁ Sync'; btn.classList.remove('syncing'); }
     showToast(STRINGS[lang].toastSynced);
     if(callback) callback();
@@ -371,16 +366,6 @@ function loadFromSheets() {
   .then(function(rows){
     if(rows && rows.length > 0){
       data = rows;
-      // Restore local status/notes overrides (fedex_v3)
-      try {
-        var v3 = JSON.parse(localStorage.getItem('fedex_v3') || '[]');
-        v3.forEach(function(ov){ var r = data.find(function(d){ return d.id === ov.id; }); if(r){ r.status = ov.status; if(ov.notes) r.notes = ov.notes; } });
-      } catch(e){}
-      // Restore manually added rows (fedex_added)
-      try {
-        var added = JSON.parse(localStorage.getItem('fedex_added') || '[]');
-        if(added.length > 0){ data = data.concat(added); }
-      } catch(e){}
       sheetsLoaded = true;
       setCloudStatus('☁ סונכרן מהענן', '#27AE60');
       showToast(STRINGS[lang].toastSynced);
@@ -399,19 +384,12 @@ function loadFromSheets() {
   .catch(function(err){
     console.warn('Could not load from Sheets:', err);
     setCloudStatus('⚠ עובד במצב לא מקוון', '#7070A0');
-    // Restore local overrides even in offline mode
-    try {
-      var v3 = JSON.parse(localStorage.getItem('fedex_v3') || '[]');
-      v3.forEach(function(ov){ var r = data.find(function(d){ return d.id === ov.id; }); if(r){ r.status = ov.status; if(ov.notes) r.notes = ov.notes; } });
-    } catch(e){}
-    try {
-      var added = JSON.parse(localStorage.getItem('fedex_added') || '[]');
-      if(added.length > 0){ data = data.concat(added); }
-    } catch(e){}
+    // Keep local RAW data
     renderDashboard();
     applyFilters();
   });
 }
+
 function manualSync() {
   syncToSheets();
 }
