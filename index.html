@@ -366,6 +366,16 @@ function loadFromSheets() {
   .then(function(rows){
     if(rows && rows.length > 0){
       data = rows;
+      // Restore local status/notes overrides (fedex_v3)
+      try {
+        var v3 = JSON.parse(localStorage.getItem('fedex_v3') || '[]');
+        v3.forEach(function(ov){ var r = data.find(function(d){ return d.id === ov.id; }); if(r){ r.status = ov.status; if(ov.notes) r.notes = ov.notes; } });
+      } catch(e){}
+      // Restore manually added rows (fedex_added)
+      try {
+        var added = JSON.parse(localStorage.getItem('fedex_added') || '[]');
+        if(added.length > 0){ data = data.concat(added); }
+      } catch(e){}
       sheetsLoaded = true;
       setCloudStatus('☁ סונכרן מהענן', '#27AE60');
       showToast(STRINGS[lang].toastSynced);
@@ -384,12 +394,19 @@ function loadFromSheets() {
   .catch(function(err){
     console.warn('Could not load from Sheets:', err);
     setCloudStatus('⚠ עובד במצב לא מקוון', '#7070A0');
-    // Keep local RAW data
+    // Restore local overrides even in offline mode
+    try {
+      var v3 = JSON.parse(localStorage.getItem('fedex_v3') || '[]');
+      v3.forEach(function(ov){ var r = data.find(function(d){ return d.id === ov.id; }); if(r){ r.status = ov.status; if(ov.notes) r.notes = ov.notes; } });
+    } catch(e){}
+    try {
+      var added = JSON.parse(localStorage.getItem('fedex_added') || '[]');
+      if(added.length > 0){ data = data.concat(added); }
+    } catch(e){}
     renderDashboard();
     applyFilters();
   });
 }
-
 function manualSync() {
   syncToSheets();
 }
