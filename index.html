@@ -334,12 +334,17 @@ function syncToSheets(callback) {
 
   fetch(SHEETS_URL, {
     method: 'POST',
-    mode: 'no-cors',
+    mode: 'cors',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action: 'sync', rows: data })
   })
-  .then(function(){
-    setCloudStatus('✓ נשמר בענן ' + new Date().toLocaleTimeString('he-IL'), '#27AE60');
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if(res && res.result === 'success'){
+      setCloudStatus('✓ נשמר בענן ' + new Date().toLocaleTimeString('he-IL'), '#27AE60');
+    } else {
+      setCloudStatus('⚠ שגיאת ענן', '#C0392B');
+    }
     if(btn){ btn.textContent = '☁ Sync'; btn.classList.remove('syncing'); }
     showToast(STRINGS[lang].toastSynced);
     if(callback) callback();
