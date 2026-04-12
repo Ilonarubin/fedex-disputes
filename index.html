@@ -398,16 +398,7 @@ function manualSync() {
 // SAVE — always syncs to Sheets
 // =============================================
 function saveStorage(){
-  // Save locally too as backup
-  try {
-    localStorage.setItem('fedex_v3', JSON.stringify(
-      data.filter(r=>r.id<10000).map(r=>({id:r.id,status:r.status,notes:r.notes}))
-    ));
-    const added = data.filter(r=>r.id>=10000);
-    if(added.length>0) localStorage.setItem('fedex_added', JSON.stringify(added));
-  } catch(e){}
-  // Sync to Google Sheets
-  syncToSheets();
+syncToSheets();
 }
 
 function showPage(page,btn){
