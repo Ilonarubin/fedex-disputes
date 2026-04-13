@@ -12,7 +12,7 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 nav{display:flex;align-items:center;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;}
-.nav-logo{font-size:1.1rem;font-weight:800;color:var(--red);padding:1rem 1rem 1rem 0;letter-spacing:-0.03em;border-right:1px solid var(--border);margin-right:0.5rem;white-space:nowrap;}
+.nav-logo{font-size:1.1rem;font-weight:800;color:var(--red);padding:rem 1rem 1rem 0;letter-spacing:-0.03em;border-right:1px solid var(--border);margin-right:0.5rem;white-space:nowrap;}
 .nav-logo span{color:var(--text);}
 .nav-tabs{display:flex;gap:0;}
 .nav-tab{padding:1.1rem 1.2rem;font-size:0.8rem;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s;font-family:'Syne',sans-serif;}
@@ -334,7 +334,7 @@ function syncToSheets(callback) {
 
   fetch(SHEETS_URL, {
     method: 'POST',
-    mode: 'no-cors',
+    redirect: 'follow',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action: 'sync', rows: data })
   })
